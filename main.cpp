@@ -107,7 +107,7 @@ public:
 
             if( !is_in )
             {
-                Element* e = new Element();
+                Element * e = new Element();
                 for( set<int>::iterator itr = initialStocks.begin(); itr != initialStocks.end(); ++itr )
                 {
                     e->m_stocks.insert(*itr);
@@ -129,6 +129,7 @@ public:
             q.pop();
         }
     }
+
 
     double getCost( set<int>& stocks, const double **pweight, int k )
     {
@@ -213,11 +214,8 @@ public:
 //    }
 };
 
-Element* search( set<int> stocks, const double **pweight, int p, unsigned int k );
-
 Element* search( const set<int> stocks, const double **pweight, int p, unsigned int k )
 {
-
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
 
     for( int i=0; i < p; i++ )
@@ -225,9 +223,9 @@ Element* search( const set<int> stocks, const double **pweight, int p, unsigned 
         Element* e = new Element();
         set<int> originalStocks;
 
-        originalStocks.insert(i);
-        e->appendTop(originalStocks, stocks, pweight, k);
-        Q.push(e);
+        originalStocks.insert( i );
+        e->appendTop( originalStocks, stocks, pweight, k );
+        Q.push( e );
     }
 
 //    print_queue(Q);
@@ -238,7 +236,7 @@ Element* search( const set<int> stocks, const double **pweight, int p, unsigned 
     while( anotherE->m_stocks.size() < k )
     {
         anotherE->appendTop( anotherE->m_stocks, stocks, pweight, k );
-        Q.push(anotherE);
+        Q.push(  anotherE );
         anotherE = Q.top();
         Q.pop();
     }
@@ -246,20 +244,24 @@ Element* search( const set<int> stocks, const double **pweight, int p, unsigned 
     return anotherE;
 }
 
+Element* searchPseudoBrute( const set<int> stocks, const double **pweight, int p, unsigned int k )
+{
+}
+
 double** load_matrix( const char *in_file_name, unsigned int* p )
 {
     FILE  *in;
     FILE  *out = NULL;
     double **pweight;
-    int i, j,lo,k;
+    int i, j, lo, k;
     double w;
     long e_count;
     unsigned int size = 0;
 
-    if( ( in = fopen(in_file_name, "r" ) ) == NULL )
+    if( ( in = fopen( in_file_name, "r" ) ) == NULL )
     {
         printf( "  fopen failed for input\n" );
-        exit(1);
+        exit( 1 );
     }
 
     fscanf( in, "%d %d", &size, &i );
@@ -398,17 +400,17 @@ int main( int argc, char **argv )
     cout << "Cost of solution (SUM): " << value_from_sol << endl;
 
     ////Mod -> Imprime vetor--------------------------------------------------------------------
-    cout << endl << "-----------------------------------------" << endl;
-    for( int i=0; i < p; ++i )
-    {
-        for( int j=0; j < p; ++j )
-        {
-            if( i < j )
-            {
-                cout << "matrix[" << i << "][" << j << "] = " << pweight[i][j] << endl;
-            }
-        }
-    }
+//    cout << endl << "-----------------------------------------" << endl;
+//    for( int i=0; i < p; ++i )
+//    {
+//        for( int j=0; j < p; ++j )
+//        {
+//            if( i < j )
+//            {
+//                cout << "matrix[" << i << "][" << j << "] = " << pweight[i][j] << endl;
+//            }
+//        }
+//    }
     /////-------------------------------------------------------------------------------------------------
 
     return 0;
