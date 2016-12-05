@@ -130,16 +130,15 @@ public:
         }
     }
 
-
-    double getCost( set<int>& stocks, const double **pweight, int k )
+    static double getCost( set<int>& stocks, const double **pweight, int k, double minVal = 1 )
     {
-        int h = k - stocks.size();
+        int h = ( k - stocks.size() ) * minVal;
         double f = calcG( stocks, pweight ) + h; //Mod -> f = g + h
         return f;
     }
 
     //Mod -> Calcula g
-    double calcG( set<int>& stocks, const double **pweight )
+    static double calcG( set<int>& stocks, const double **pweight )
     {
         int p = stocks.size();
 
@@ -170,48 +169,6 @@ public:
             exit(1);
         }
     }
-
-    //TODO: Verificar o que é isso
-//    template <class T = unsigned long>
-//    T binomial_coefficient( unsigned long n, unsigned long k )
-//    {
-//        unsigned long i;
-//        T b;
-
-//        if( 0 == k || n == k )
-//        {
-//            return 1;
-//        }
-
-//        if( k > n )
-//        {
-//            return 0;
-//        }
-
-//        if( k > ( n - k ) )
-//        {
-//            k = n - k;
-//        }
-
-//        if( 1 == k )
-//        {
-//            return n;
-//        }
-
-//        b = 1;
-//        for( i = 1; i <= k; ++i )
-//        {
-//            b *= ( n - ( k - i ) );
-//            if ( b < 0 )
-//            {
-//                return -1; /* Overflow */
-//            }
-
-//            b /= i;
-//        }
-
-//        return b;
-//    }
 };
 
 Element* search( const set<int> stocks, const double **pweight, int p, unsigned int k )
@@ -244,8 +201,66 @@ Element* search( const set<int> stocks, const double **pweight, int p, unsigned 
     return anotherE;
 }
 
-Element* searchPseudoBrute( const set<int> stocks, const double **pweight, int p, unsigned int k )
+Element* searchPseudoBrute( const set<int> stocks, const double **pweight, int p, unsigned int k, double minVal )
 {
+    priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
+
+    /* (1) Inicializa a fila com as primeiras ações */
+    for( int i=0; i < p; i++ )
+    {
+        for( int j=0; j < p; j++ )
+        {
+            if( i < j )
+            {
+                Element* e = new Element();
+                set<int> initialStocks;
+                initialStocks.insert( i );
+                initialStocks.insert( j );
+                e->m_stocks = initialStocks;
+                e->m_cost = Element::getCost( e->m_stocks, pweight, k, minVal );
+                Q.push( e );
+            }
+        }
+    }
+    //----------------------------------------------------------------------------
+
+    /* (2) Pega o elemento do topo (melhor candidato) e verifica a melhor combinação.
+     * Repete o processo até ter o número k de ações. */
+    Element* anotherE = Q.top();
+    Q.pop();
+
+    while( anotherE->m_stocks.size() < k )
+    {
+        for( set<int>::iterator it = stocks.begin(); it != stocks.end(); ++it )
+        {
+            const bool is_in = anotherE->m_stocks.find(*it) != anotherE->m_stocks.end();
+
+            if( !is_in )
+            {
+                Element * e = new Element();
+                for( set<int>::iterator itr = anotherE->m_stocks.begin(); itr != anotherE->m_stocks.end(); ++itr )
+                {
+                    e->m_stocks.insert(*itr);
+                }
+                e->m_stocks.insert(*it);
+                e->m_cost = Element::getCost( e->m_stocks, pweight, k, minVal );
+                Q.push(e);
+            }
+        }
+
+        anotherE = Q.top();
+        Q.pop();
+
+        while( !Q.empty() )
+        {
+            Element* e = Q.top();
+            delete e;
+            Q.pop();
+        }
+    }
+    //-------------------------------------------------------------------------------------------------------------
+
+    return anotherE;
 }
 
 double** load_matrix( const char *in_file_name, unsigned int* p )
@@ -285,6 +300,25 @@ double** load_matrix( const char *in_file_name, unsigned int* p )
     }
 
     return pweight;
+}
+
+double matrixMinVal( double **pweight, int p )
+{
+    double min = pweight[0][1];
+    for( int i=0; i < p; ++i )
+    {
+        for( int j=0; j < p; ++j )
+        {
+            double currVal = pweight[i][j];
+            if( i < j
+                    && currVal < min )
+            {
+                min = currVal;
+            }
+        }
+    }
+
+    return min;
 }
 
 int main( int argc, char **argv )
@@ -366,7 +400,10 @@ int main( int argc, char **argv )
         stocks.insert(i);
     }
 
-    Element* elementWithTopStocks = search( stocks, ( const double** ) pweight, p, k );
+    double minVal = matrixMinVal( pweight, p );
+
+    Element* elementWithTopStocks = searchPseudoBrute( stocks, ( const double** ) pweight, p, k, minVal );
+//    Element* elementWithTopStocks = search( stocks, ( const double** ) pweight, p, k );
 
     cout << "Top k stocks: ";
     set<int>::iterator it;
