@@ -97,7 +97,7 @@ public:
         //	    cout << "Object is being deleted" << endl;
     }
 
-    void appendTop( set<int> initialStocks, set<int> allStocks, const double **pweight, int k )
+    void appendTop( set<int> initialStocks, set<int> allStocks, const double **pweight, int k, double minVal )
     {
         priority_queue<Element*, vector<Element*>, DereferenceCompareElement> q;
 
@@ -113,13 +113,13 @@ public:
                     e->m_stocks.insert(*itr);
                 }
                 e->m_stocks.insert(*it);
-                e->m_cost = getCost( e->m_stocks, pweight, k );
+                e->m_cost = getCost( e->m_stocks, pweight, k, minVal );
                 q.push(e);
             }
         }
 
         this->m_stocks = q.top()->m_stocks;
-        this->m_cost = getCost( this->m_stocks, pweight, k );
+        this->m_cost = getCost( this->m_stocks, pweight, k, minVal );
         q.pop();
 
         while( !q.empty() )
@@ -130,7 +130,7 @@ public:
         }
     }
 
-    static double getCost( set<int>& stocks, const double **pweight, int k, double minVal = 1 )
+    static double getCost( set<int>& stocks, const double **pweight, int k, double minVal )
     {
         int h = ( k - stocks.size() ) * minVal;
         double f = calcG( stocks, pweight ) + h; //Mod -> f = g + h
@@ -171,7 +171,45 @@ public:
     }
 };
 
-Element* search( const set<int> stocks, const double **pweight, int p, unsigned int k )
+vector<Element*> findTopElements( set<int> initialStocks, set<int> allStocks, const double **pweight, int k, int j, double minVal )
+{
+    priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> q;
+
+    vector<Element*> topStocks;
+
+    for( set<int>::iterator it = allStocks.begin(); it != allStocks.end(); ++it )
+    {
+        const bool is_in = initialStocks.find(*it) != initialStocks.end();
+
+        if( !is_in )
+        {
+            Element * e = new Element();
+            for( set<int>::iterator itr = initialStocks.begin(); itr != initialStocks.end(); ++itr )
+            {
+                e->m_stocks.insert(*itr);
+            }
+            e->m_stocks.insert(*it);
+            e->m_cost = Element::getCost( e->m_stocks, pweight, k, minVal );
+            q.push(e);
+        }
+    }
+
+    for( int i=0; i < j; ++i )
+    {
+        Element* e = q.top();
+        topStocks.push_back( e );
+        q.pop();
+    }
+
+    while( !q.empty() )
+    {
+        q.pop();
+    }
+
+    return topStocks;
+}
+
+Element* searchRmCrag( const set<int> stocks, const double **pweight, int p, unsigned int k, double minVal )
 {
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
 
@@ -181,7 +219,7 @@ Element* search( const set<int> stocks, const double **pweight, int p, unsigned 
         set<int> originalStocks;
 
         originalStocks.insert( i );
-        e->appendTop( originalStocks, stocks, pweight, k );
+        e->appendTop( originalStocks, stocks, pweight, k, minVal );
         Q.push( e );
     }
 
@@ -192,7 +230,7 @@ Element* search( const set<int> stocks, const double **pweight, int p, unsigned 
 
     while( anotherE->m_stocks.size() < k )
     {
-        anotherE->appendTop( anotherE->m_stocks, stocks, pweight, k );
+        anotherE->appendTop( anotherE->m_stocks, stocks, pweight, k, minVal );
         Q.push(  anotherE );
         anotherE = Q.top();
         Q.pop();
@@ -205,7 +243,6 @@ Element* searchPseudoBrute( const set<int> stocks, const double **pweight, int p
 {
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
 
-    /* (1) Inicializa a fila com as primeiras ações */
     for( int i=0; i < p; i++ )
     {
         for( int j=0; j < p; j++ )
@@ -217,28 +254,26 @@ Element* searchPseudoBrute( const set<int> stocks, const double **pweight, int p
                 initialStocks.insert( i );
                 initialStocks.insert( j );
                 e->m_stocks = initialStocks;
-                e->m_cost = Element::getCost( e->m_stocks, pweight, k, minVal );
+                e->m_cost = Element::getCost( e->m_stocks, pweight, k, 1 );
                 Q.push( e );
             }
         }
     }
     //----------------------------------------------------------------------------
 
-    /* (2) Pega o elemento do topo (melhor candidato) e verifica a melhor combinação.
-     * Repete o processo até ter o número k de ações. */
-    Element* anotherE = Q.top();
+    Element* topElement = Q.top();
     Q.pop();
 
-    while( anotherE->m_stocks.size() < k )
+    while( topElement->m_stocks.size() < k )
     {
         for( set<int>::iterator it = stocks.begin(); it != stocks.end(); ++it )
         {
-            const bool is_in = anotherE->m_stocks.find(*it) != anotherE->m_stocks.end();
+            const bool is_in = topElement->m_stocks.find(*it) != topElement->m_stocks.end();
 
             if( !is_in )
             {
                 Element * e = new Element();
-                for( set<int>::iterator itr = anotherE->m_stocks.begin(); itr != anotherE->m_stocks.end(); ++itr )
+                for( set<int>::iterator itr = topElement->m_stocks.begin(); itr != topElement->m_stocks.end(); ++itr )
                 {
                     e->m_stocks.insert(*itr);
                 }
@@ -248,19 +283,48 @@ Element* searchPseudoBrute( const set<int> stocks, const double **pweight, int p
             }
         }
 
-        anotherE = Q.top();
+        topElement = Q.top();
         Q.pop();
-
-        while( !Q.empty() )
-        {
-            Element* e = Q.top();
-            delete e;
-            Q.pop();
-        }
     }
     //-------------------------------------------------------------------------------------------------------------
 
-    return anotherE;
+    return topElement;
+}
+
+Element* searchAlternative( const set<int> stocks, const double **pweight, int p, unsigned int k, int j, double minVal )
+{
+    priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
+
+    for( int i=0; i < p; i++ )
+    {
+        set<int> originalStocks;
+
+        originalStocks.insert( i );
+        vector<Element*> topElements = findTopElements( originalStocks, stocks, pweight, k, j, minVal );
+
+        for( unsigned i=0; i < topElements.size(); ++i )
+        {
+            Q.push( topElements[i] );
+        }
+    }
+
+    Element* topElement = Q.top();
+    Q.pop();
+
+    while( topElement->m_stocks.size() < k )
+    {
+        vector<Element*> topElements = findTopElements( topElement->m_stocks, stocks, pweight, k, j, minVal );
+
+        for( unsigned i=0; i < topElements.size(); ++i )
+        {
+            Q.push( topElements[i] );
+        }
+
+        topElement = Q.top();
+        Q.pop();
+    }
+
+    return topElement;
 }
 
 double** load_matrix( const char *in_file_name, unsigned int* p )
@@ -402,8 +466,9 @@ int main( int argc, char **argv )
 
     double minVal = matrixMinVal( pweight, p );
 
-    Element* elementWithTopStocks = searchPseudoBrute( stocks, ( const double** ) pweight, p, k, minVal );
-//    Element* elementWithTopStocks = search( stocks, ( const double** ) pweight, p, k );
+    Element* elementWithTopStocks = searchAlternative( stocks, ( const double** ) pweight, p, k, 2, minVal );
+//    Element* elementWithTopStocks = searchPseudoBrute( stocks, ( const double** ) pweight, p, k, minVal );
+//    Element* elementWithTopStocks = searchRmCrag( stocks, ( const double** ) pweight, p, k, minVal );
 
     cout << "Top k stocks: ";
     set<int>::iterator it;
