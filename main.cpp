@@ -203,6 +203,8 @@ vector<Element*> findTopElements( set<int> initialStocks, set<int> allStocks, co
 
     while( !q.empty() )
     {
+        Element* e = q.top();
+        delete e;
         q.pop();
     }
 
@@ -387,8 +389,7 @@ double matrixMinVal( double **pweight, int p )
 
 int main( int argc, char **argv )
 {
-    time_t tstart, tend;
-    tstart = time(0);
+    clock_t time = clock();
 
     char* in_file_name;
 
@@ -479,9 +480,9 @@ int main( int argc, char **argv )
 
     cout << endl;
 
-    tend = time(0);
+    time = clock() - time;
 
-    cout << "Search took "<< difftime( tend, tstart ) << " second(s)."<< endl;
+    cout << "Search took "<< double(time) / CLOCKS_PER_SEC * 1000 << " millisecond(s)."<< endl;
 
     cout << "Cost of solution (AVG): " << elementWithTopStocks->m_cost << endl;
 
