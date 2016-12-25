@@ -21,6 +21,8 @@
 #include <unistd.h>
 #include <ctime>
 
+#include <memory>
+
 
 #define ALS(X,Y,Z) if ((X=(Y *)calloc(Z,sizeof(Y)))==NULL) \
        {fprintf(out,"  failure in memory allocation\n");exit(0);}
@@ -171,11 +173,9 @@ public:
     }
 };
 
-vector<Element*> findTopElements( set<int> initialStocks, set<int> allStocks, const double **pweight, int k, int j, double minVal )
+void findTopElements( set<int> initialStocks, set<int> allStocks, const double **pweight, int k, int j, double minVal, priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> *Q )
 {
-    priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> q;
-
-    vector<Element*> topStocks;
+    priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> auxQueue;
 
     for( set<int>::iterator it = allStocks.begin(); it != allStocks.end(); ++it )
     {
@@ -190,28 +190,26 @@ vector<Element*> findTopElements( set<int> initialStocks, set<int> allStocks, co
             }
             e->m_stocks.insert(*it);
             e->m_cost = Element::getCost( e->m_stocks, pweight, k, minVal );
-            q.push(e);
+            auxQueue.push(e);
         }
     }
 
     for( int i=0; i < j; ++i )
     {
-        Element* e = q.top();
-        topStocks.push_back( e );
-        q.pop();
+        Element* e = auxQueue.top();
+        Q->push( e );
+        auxQueue.pop();
     }
 
-    while( !q.empty() )
+    while( !auxQueue.empty() )
     {
-        Element* e = q.top();
+        Element* e = auxQueue.top();
         delete e;
-        q.pop();
+        auxQueue.pop();
     }
-
-    return topStocks;
 }
 
-Element* searchRmCrag( const set<int> stocks, const double **pweight, int p, unsigned int k, double minVal )
+Element searchRmCrag( const set<int> stocks, const double **pweight, int p, unsigned int k, double minVal )
 {
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
 
@@ -227,14 +225,15 @@ Element* searchRmCrag( const set<int> stocks, const double **pweight, int p, uns
 
 //    print_queue(Q);
 
-    Element* anotherE = Q.top();
+    Element anotherE = *Q.top();
+    delete Q.top();
     Q.pop();
 
-    while( anotherE->m_stocks.size() < k )
+    while( anotherE.m_stocks.size() < k )
     {
-        anotherE->appendTop( anotherE->m_stocks, stocks, pweight, k, minVal );
-        Q.push(  anotherE );
-        anotherE = Q.top();
+        anotherE.appendTop( anotherE.m_stocks, stocks, pweight, k, minVal );
+        Q.push(  &anotherE );
+        anotherE = *Q.top();
         Q.pop();
     }
 
@@ -293,7 +292,7 @@ Element* searchPseudoBrute( const set<int> stocks, const double **pweight, int p
     return topElement;
 }
 
-Element* searchAlternative( const set<int> stocks, const double **pweight, int p, unsigned int k, int j, double minVal )
+Element searchAlternative( const set<int> stocks, const double **pweight, int p, unsigned int k, int j, double minVal )
 {
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
 
@@ -302,34 +301,32 @@ Element* searchAlternative( const set<int> stocks, const double **pweight, int p
         set<int> originalStocks;
 
         originalStocks.insert( i );
-        vector<Element*> topElements = findTopElements( originalStocks, stocks, pweight, k, j, minVal );
-
-        for( unsigned i=0; i < topElements.size(); ++i )
-        {
-            Q.push( topElements[i] );
-        }
+        findTopElements( originalStocks, stocks, pweight, k, j, minVal, &Q );
     }
 
-    Element* topElement = Q.top();
+    Element topElement = *Q.top();
+    delete Q.top();
     Q.pop();
 
-    while( topElement->m_stocks.size() < k )
+    while( topElement.m_stocks.size() < k )
     {
-        vector<Element*> topElements = findTopElements( topElement->m_stocks, stocks, pweight, k, j, minVal );
+        findTopElements( topElement.m_stocks, stocks, pweight, k, j, minVal, &Q );
 
-        for( unsigned i=0; i < topElements.size(); ++i )
-        {
-            Q.push( topElements[i] );
-        }
+        topElement = *Q.top();
+        delete Q.top();
+        Q.pop();
+    }
 
-        topElement = Q.top();
+    while( !Q.empty() )
+    {
+        delete Q.top();
         Q.pop();
     }
 
     return topElement;
 }
 
-double** load_matrix( const char *in_file_name, unsigned int* p )
+double** load_matrix( const char *in_file_name, int* p )
 {
     FILE  *in;
     FILE  *out = NULL;
@@ -337,7 +334,7 @@ double** load_matrix( const char *in_file_name, unsigned int* p )
     int i, j, lo, k;
     double w;
     long e_count;
-    unsigned int size = 0;
+    int size = 0;
 
     if( ( in = fopen( in_file_name, "r" ) ) == NULL )
     {
@@ -391,10 +388,10 @@ int main( int argc, char **argv )
 {
     clock_t time = clock();
 
-    char* in_file_name;
+    char* in_file_name = NULL;
 
-    unsigned int p;
-    unsigned int k;
+    int p = -1;
+    int k = -1;
 
     int c;
 
@@ -467,13 +464,13 @@ int main( int argc, char **argv )
 
     double minVal = matrixMinVal( pweight, p );
 
-    Element* elementWithTopStocks = searchAlternative( stocks, ( const double** ) pweight, p, k, 2, minVal );
-//    Element* elementWithTopStocks = searchPseudoBrute( stocks, ( const double** ) pweight, p, k, minVal );
-//    Element* elementWithTopStocks = searchRmCrag( stocks, ( const double** ) pweight, p, k, minVal );
+    Element elementWithTopStocks = searchAlternative( stocks, ( const double** ) pweight, p, k, 2, minVal );
+//    Element elementWithTopStocks = searchPseudoBrute( stocks, ( const double** ) pweight, p, k, minVal );
+//    Element elementWithTopStocks = searchRmCrag( stocks, ( const double** ) pweight, p, k, minVal );
 
     cout << "Top k stocks: ";
     set<int>::iterator it;
-    for (it = elementWithTopStocks->m_stocks.begin(); it != elementWithTopStocks->m_stocks.end(); ++it)
+    for (it = elementWithTopStocks.m_stocks.begin(); it != elementWithTopStocks.m_stocks.end(); ++it)
     {
         cout << *it << " ";
     }
@@ -484,15 +481,15 @@ int main( int argc, char **argv )
 
     cout << "Search took "<< double(time) / CLOCKS_PER_SEC * 1000 << " millisecond(s)."<< endl;
 
-    cout << "Cost of solution (AVG): " << elementWithTopStocks->m_cost << endl;
+    cout << "Cost of solution (AVG): " << elementWithTopStocks.m_cost << endl;
 
     /** Print cost of solution **/
     set<int>::iterator itA, itB;
     double value_from_sol = 0.0;
 
-    for ( itA = elementWithTopStocks->m_stocks.begin(); itA != elementWithTopStocks->m_stocks.end(); ++itA )
+    for ( itA = elementWithTopStocks.m_stocks.begin(); itA != elementWithTopStocks.m_stocks.end(); ++itA )
     {
-        for ( itB = elementWithTopStocks->m_stocks.begin(); itB != elementWithTopStocks->m_stocks.end(); ++itB )
+        for ( itB = elementWithTopStocks.m_stocks.begin(); itB != elementWithTopStocks.m_stocks.end(); ++itB )
         {
             if( *itA > *itB )
             {
