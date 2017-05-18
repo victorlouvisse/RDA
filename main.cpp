@@ -1,5 +1,5 @@
 /****************************************************************************************
- * Algoritmo para calcular os conjuntos menos diversos. Baseado no A* e RM-CRAG.
+ * Algoritmo para calcular diversidade de conjuntos. Baseado no A* e RM-CRAG.
  *
  * Entradas: -f (char) -> arquivo txt de dataset ((obrigatório)
  *           -k (char) -> quantidade de conjutos para resultado (obrigatório)
@@ -12,6 +12,7 @@
 #include <set>
 #include <vector>
 #include <iostream>
+#include <iomanip>
 #include <limits>
 #include <math.h>
 
@@ -39,6 +40,10 @@
 
 using namespace std;
 
+clock_t TIME;
+
+
+/** Utils ************************************************************************************************************************************ */
 template<typename T> void print_queue( T& q1 )
 {
     T q = q1;
@@ -66,7 +71,9 @@ void printClusteringsLabels( ostream& os, const set<int>& stocks )
         os << label << ' ';
     }
 }
+/** ****************************************************************************************************************************************** */
 
+/** Class Element ********************************************************************************************************************* */
 class Element
 {
 
@@ -96,7 +103,6 @@ public:
 
     ~Element()
     {
-        //	    cout << "Object is being deleted" << endl;
     }
 
     void appendTop( set<int> initialStocks, set<int> allStocks, const double **pweight, int k, double minVal )
@@ -135,18 +141,17 @@ public:
     static double getCost( set<int>& stocks, const double **pweight, int k, double minVal )
     {
         int h = ( k - stocks.size() ) * minVal;
-        double f = calcG( stocks, pweight ) + h; //Mod -> f = g + h
+        double f = calcG( stocks, pweight ) + h; //f = g + h
         return f;
     }
 
-    //Mod -> Calcula g
+    //Calcula g
     static double calcG( set<int>& stocks, const double **pweight )
     {
         int p = stocks.size();
 
         if( p > 1 )
         {
-            //double factor = 1.0 / binomial_coefficient(p, 2);
             double sum = 0.0;
 
             for( set<int>::iterator it1 = stocks.begin(); it1 != stocks.end(); ++it1 )
@@ -163,7 +168,7 @@ public:
                 }
             }
 
-            return /*factor **/ sum;
+            return sum;
         }
         else
         {
@@ -172,43 +177,9 @@ public:
         }
     }
 };
+/** *************************************************************************************************************************************** */
 
-void findTopElements( set<int> initialStocks, set<int> allStocks, const double **pweight, int k, int j, double minVal, priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> *Q )
-{
-    priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> auxQueue;
-
-    for( set<int>::iterator it = allStocks.begin(); it != allStocks.end(); ++it )
-    {
-        const bool is_in = initialStocks.find(*it) != initialStocks.end();
-
-        if( !is_in )
-        {
-            Element * e = new Element();
-            for( set<int>::iterator itr = initialStocks.begin(); itr != initialStocks.end(); ++itr )
-            {
-                e->m_stocks.insert(*itr);
-            }
-            e->m_stocks.insert(*it);
-            e->m_cost = Element::getCost( e->m_stocks, pweight, k, minVal );
-            auxQueue.push(e);
-        }
-    }
-
-    for( int i=0; i < j; ++i )
-    {
-        Element* e = auxQueue.top();
-        Q->push( e );
-        auxQueue.pop();
-    }
-
-    while( !auxQueue.empty() )
-    {
-        Element* e = auxQueue.top();
-        delete e;
-        auxQueue.pop();
-    }
-}
-
+/** RM-CRAG ********************************************************************************************************************************** */
 Element searchRmCrag( const set<int> stocks, const double **pweight, int p, unsigned int k, double minVal )
 {
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
@@ -223,99 +194,120 @@ Element searchRmCrag( const set<int> stocks, const double **pweight, int p, unsi
         Q.push( e );
     }
 
-//    print_queue(Q);
+    cout << Q.size() << endl;
 
     Element anotherE = *Q.top();
     delete Q.top();
     Q.pop();
 
+    int count = 0;
+
     while( anotherE.m_stocks.size() < k )
     {
         anotherE.appendTop( anotherE.m_stocks, stocks, pweight, k, minVal );
         Q.push(  &anotherE );
+
+        cout << Q.size() << " " << count++ << endl;
+
         anotherE = *Q.top();
         Q.pop();
     }
 
+    cout << Q.size() << endl;
+
     return anotherE;
 }
+/** ****************************************************************************************************************************************** */
 
-Element* searchPseudoBrute( const set<int> stocks, const double **pweight, int p, unsigned int k, double minVal )
+/** RDA (RM-CRAG Alternativo) ************************************************************************************************************* */
+void findTopElements( set<int> initialStocks, set<int> allStocks, const double **pweight, int k, int j, double minVal, priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> *Q )
 {
-    priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
+    priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> auxQueue;
 
-    for( int i=0; i < p; i++ )
+    for( set<int>::iterator it = allStocks.begin(); it != allStocks.end(); ++it )
     {
-        for( int j=0; j < p; j++ )
+        bool isIn = initialStocks.find(*it) != initialStocks.end();
+
+        if( !isIn )
         {
-            if( i < j )
+            Element * e = new Element();
+            for( set<int>::iterator itr = initialStocks.begin(); itr != initialStocks.end(); ++itr )
             {
-                Element* e = new Element();
-                set<int> initialStocks;
-                initialStocks.insert( i );
-                initialStocks.insert( j );
-                e->m_stocks = initialStocks;
-                e->m_cost = Element::getCost( e->m_stocks, pweight, k, 1 );
-                Q.push( e );
+                e->m_stocks.insert(*itr);
             }
+            e->m_stocks.insert(*it);
+            e->m_cost = Element::getCost( e->m_stocks, pweight, k, minVal );
+            auxQueue.push(e);
         }
     }
-    //----------------------------------------------------------------------------
 
-    Element* topElement = Q.top();
-    Q.pop();
-
-    while( topElement->m_stocks.size() < k )
+    int count = 0;
+    while( !auxQueue.empty() )
     {
-        for( set<int>::iterator it = stocks.begin(); it != stocks.end(); ++it )
-        {
-            const bool is_in = topElement->m_stocks.find(*it) != topElement->m_stocks.end();
+        Element* e = auxQueue.top();
 
-            if( !is_in )
-            {
-                Element * e = new Element();
-                for( set<int>::iterator itr = topElement->m_stocks.begin(); itr != topElement->m_stocks.end(); ++itr )
-                {
-                    e->m_stocks.insert(*itr);
-                }
-                e->m_stocks.insert(*it);
-                e->m_cost = Element::getCost( e->m_stocks, pweight, k, minVal );
-                Q.push(e);
-            }
+        if( count < j )
+        {
+            Q->push( e );
+        }
+        else
+        {
+            delete e;
         }
 
-        topElement = Q.top();
-        Q.pop();
-    }
-    //-------------------------------------------------------------------------------------------------------------
+        auxQueue.pop();
 
-    return topElement;
+        count++;
+    }
 }
 
-Element searchAlternative( const set<int> stocks, const double **pweight, int p, unsigned int k, int j, double minVal )
+Element searchRDA( const set<int> stocks, const double **pweight, int p, unsigned int k, int j, const double minVal )
 {
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
 
     for( int i=0; i < p; i++ )
     {
-        set<int> originalStocks;
+        set<int> initialStocks;
 
-        originalStocks.insert( i );
-        findTopElements( originalStocks, stocks, pweight, k, j, minVal, &Q );
+        initialStocks.insert( i );
+        findTopElements( initialStocks, stocks, pweight, k, j, minVal, &Q );
     }
 
     Element topElement = *Q.top();
     delete Q.top();
     Q.pop();
 
+    int iCount = 0;
+    unsigned currStockSize = 1;
+
+    cout << endl << "**************************************************" << endl; //verbose
+
     while( topElement.m_stocks.size() < k )
     {
+        iCount++;
+
+        if( topElement.m_stocks.size() > currStockSize ) //verbose
+        {
+            TIME = clock() - TIME;
+
+            cout << "i = " << left << setw(10) << iCount
+                 << " sz = " <<  left << setw(3) << topElement.m_stocks.size()
+                 << " cost = " <<  left << setw(13) << topElement.m_cost
+                 << " time(ms) = " <<  left << setw(10) << double(TIME) / CLOCKS_PER_SEC * 1000
+                 << " Qsz = " <<  left << setw(10) << Q.size() <<  endl;
+
+            currStockSize = topElement.m_stocks.size();
+        }
+
         findTopElements( topElement.m_stocks, stocks, pweight, k, j, minVal, &Q );
 
         topElement = *Q.top();
         delete Q.top();
         Q.pop();
     }
+
+    cout << "**************************************************" << endl << endl; //verbose
+    cout << "QSz final = " << Q.size() << endl; //verbose
 
     while( !Q.empty() )
     {
@@ -325,7 +317,9 @@ Element searchAlternative( const set<int> stocks, const double **pweight, int p,
 
     return topElement;
 }
+/** ****************************************************************************************************************************************** */
 
+/** Matriz *********************************************************************************************************************************** */
 double** load_matrix( const char *in_file_name, int* p )
 {
     FILE  *in;
@@ -383,10 +377,11 @@ double matrixMinVal( double **pweight, int p )
 
     return min;
 }
+/** ****************************************************************************************************************************************** */
 
 int main( int argc, char **argv )
 {
-    clock_t time = clock();
+    TIME = clock();
 
     char* in_file_name = NULL;
 
@@ -464,8 +459,7 @@ int main( int argc, char **argv )
 
     double minVal = matrixMinVal( pweight, p );
 
-    Element elementWithTopStocks = searchAlternative( stocks, ( const double** ) pweight, p, k, 2, minVal );
-//    Element elementWithTopStocks = searchPseudoBrute( stocks, ( const double** ) pweight, p, k, minVal );
+    Element elementWithTopStocks = searchRDA( stocks, ( const double** ) pweight, p, k, 2, minVal );
 //    Element elementWithTopStocks = searchRmCrag( stocks, ( const double** ) pweight, p, k, minVal );
 
     cout << "Top k stocks: ";
@@ -477,9 +471,8 @@ int main( int argc, char **argv )
 
     cout << endl;
 
-    time = clock() - time;
-
-    cout << "Search took "<< double(time) / CLOCKS_PER_SEC * 1000 << " millisecond(s)."<< endl;
+    TIME = clock() - TIME;
+    cout << "Search took "<< double(TIME) / CLOCKS_PER_SEC * 1000 << " millisecond(s)."<< endl;
 
     cout << "Cost of solution (AVG): " << elementWithTopStocks.m_cost << endl;
 
@@ -497,21 +490,8 @@ int main( int argc, char **argv )
             }
         }
     }
-    cout << "Cost of solution (SUM): " << value_from_sol << endl;
 
-    ////Mod -> Imprime vetor--------------------------------------------------------------------
-//    cout << endl << "-----------------------------------------" << endl;
-//    for( int i=0; i < p; ++i )
-//    {
-//        for( int j=0; j < p; ++j )
-//        {
-//            if( i < j )
-//            {
-//                cout << "matrix[" << i << "][" << j << "] = " << pweight[i][j] << endl;
-//            }
-//        }
-//    }
-    /////-------------------------------------------------------------------------------------------------
+    cout << "Cost of solution (SUM): " << value_from_sol << endl;
 
     return 0;
 }
