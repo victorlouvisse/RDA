@@ -42,6 +42,11 @@ using namespace std;
 
 clock_t TIME;
 
+const string ITERATOR_COUNT_STRING = "i";
+const string ELEMENT_SIZE_STRING = "sz";
+const string ELEMENT_COST_STRING = "cost";
+const string SOLUTION_TIME_STRING = "time (ms)";
+const string PRIORITY_QUEUE_SIZE_STRING = "Qsz";
 
 /** Utils ************************************************************************************************************************************ */
 template<typename T> void print_queue( T& q1 )
@@ -71,6 +76,18 @@ void printClusteringsLabels( ostream& os, const set<int>& stocks )
         os << label << ' ';
     }
 }
+
+void printVerboseHeader()
+{
+    cout << endl
+         << ITERATOR_COUNT_STRING << " = " << "Número de iterações" << endl
+         << ELEMENT_SIZE_STRING << " = " << "Tamanho atual da carteira" << endl
+         << ELEMENT_COST_STRING << " = " << "Custo atual da solução" << endl
+         << SOLUTION_TIME_STRING << " = " << "Tempo em milisegundos para encontrar a solução" << endl
+         << PRIORITY_QUEUE_SIZE_STRING << " = " << "Tamanho da fila de prioridades" << endl
+         << endl;
+}
+
 /** ****************************************************************************************************************************************** */
 
 /** Class Element ********************************************************************************************************************* */
@@ -87,8 +104,7 @@ public:
     public:
         bool operator()(const Element* lhs, const Element* rhs) const
         {
-            /* Mod - Invertemos a comparação. Assim, o heap da std::priority_queue
-              * fica com o menor valor */
+            /*  Assim, o heap da std::priority_queue fica com o menor valor. */
             return lhs->m_cost > rhs->m_cost;
         }
     };
@@ -194,26 +210,17 @@ Element searchRmCrag( const set<int> stocks, const double **pweight, int p, unsi
         Q.push( e );
     }
 
-    cout << Q.size() << endl;
-
     Element anotherE = *Q.top();
     delete Q.top();
     Q.pop();
-
-    int count = 0;
 
     while( anotherE.m_stocks.size() < k )
     {
         anotherE.appendTop( anotherE.m_stocks, stocks, pweight, k, minVal );
         Q.push(  &anotherE );
-
-        cout << Q.size() << " " << count++ << endl;
-
         anotherE = *Q.top();
         Q.pop();
     }
-
-    cout << Q.size() << endl;
 
     return anotherE;
 }
@@ -286,6 +293,8 @@ Element searchRDA( const set<int> stocks, const double **pweight, int p, unsigne
     int iCount = 0;
     unsigned currStockSize = 1;
 
+    printVerboseHeader(); //verbose
+
     cout << endl << "**************************************************" << endl; //verbose
 
     /* Enquanto o tamanho da carteira não for o desejado, adiciona as primeiras j combinações na fila Q.
@@ -298,11 +307,11 @@ Element searchRDA( const set<int> stocks, const double **pweight, int p, unsigne
         {
             TIME = clock() - TIME;
 
-            cout << "i = " << left << setw(10) << iCount
-                 << " sz = " <<  left << setw(3) << topElement.m_stocks.size()
-                 << " cost = " <<  left << setw(13) << topElement.m_cost
-                 << " time(ms) = " <<  left << setw(10) << double(TIME) / CLOCKS_PER_SEC * 1000
-                 << " Qsz = " <<  left << setw(10) << Q.size() <<  endl;
+            cout << ITERATOR_COUNT_STRING << " = " << left << setw(10) << iCount
+                 << ELEMENT_SIZE_STRING << " = " <<  left << setw(3) << topElement.m_stocks.size()
+                 << ELEMENT_COST_STRING << " = " <<  left << setw(13) << topElement.m_cost
+                 << SOLUTION_TIME_STRING << " = " <<  left << setw(10) << double(TIME) / CLOCKS_PER_SEC * 1000
+                 << PRIORITY_QUEUE_SIZE_STRING << " = " <<  left << setw(10) << Q.size() <<  endl;
 
             currStockSize = topElement.m_stocks.size();
         }
