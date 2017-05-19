@@ -220,18 +220,20 @@ Element searchRmCrag( const set<int> stocks, const double **pweight, int p, unsi
 /** ****************************************************************************************************************************************** */
 
 /** RDA (RM-CRAG Alternativo) ************************************************************************************************************* */
-void findTopElements( set<int> initialStocks, set<int> allStocks, const double **pweight, int k, int j, double minVal, priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> *Q )
+/* Adiciona os j primeiros elementos na fila de prioridades Q */
+void findTopElements( set<int> currStocks, set<int> allStocks, const double **pweight, int k, int j, double minVal, priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> *Q )
 {
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> auxQueue;
 
+    /* Combina as ações de currStocks com todas as ações do dataset */
     for( set<int>::iterator it = allStocks.begin(); it != allStocks.end(); ++it )
     {
-        bool isIn = initialStocks.find(*it) != initialStocks.end();
+        bool isIn = currStocks.find(*it) != currStocks.end();
 
         if( !isIn )
         {
             Element * e = new Element();
-            for( set<int>::iterator itr = initialStocks.begin(); itr != initialStocks.end(); ++itr )
+            for( set<int>::iterator itr = currStocks.begin(); itr != currStocks.end(); ++itr )
             {
                 e->m_stocks.insert(*itr);
             }
@@ -241,6 +243,7 @@ void findTopElements( set<int> initialStocks, set<int> allStocks, const double *
         }
     }
 
+    /* Adiciona j primeiros elementos na fila de prioridades Q e deleta o resto */
     int count = 0;
     while( !auxQueue.empty() )
     {
@@ -261,10 +264,12 @@ void findTopElements( set<int> initialStocks, set<int> allStocks, const double *
     }
 }
 
+/* Retorna o primeiro elemento com k ações */
 Element searchRDA( const set<int> stocks, const double **pweight, int p, unsigned int k, int j, const double minVal )
 {
     priority_queue<Element*, vector<Element*>, Element::DereferenceCompareElement> Q;
 
+    /* Faz a primeira rodada para ter as melhores j combinações */
     for( int i=0; i < p; i++ )
     {
         set<int> initialStocks;
@@ -273,6 +278,7 @@ Element searchRDA( const set<int> stocks, const double **pweight, int p, unsigne
         findTopElements( initialStocks, stocks, pweight, k, j, minVal, &Q );
     }
 
+    /* Pega o melhor resultado da primeira rodada */
     Element topElement = *Q.top();
     delete Q.top();
     Q.pop();
@@ -282,10 +288,12 @@ Element searchRDA( const set<int> stocks, const double **pweight, int p, unsigne
 
     cout << endl << "**************************************************" << endl; //verbose
 
+    /* Enquanto o tamanho da carteira não for o desejado, adiciona as primeiras j combinações na fila Q.
+     * Logo, a saída acontece quando primeira combinação da fila de prioridades Q possuir k ações */
     while( topElement.m_stocks.size() < k )
     {
+        //verbose ---------------------------------------------------------------------------------------
         iCount++;
-
         if( topElement.m_stocks.size() > currStockSize ) //verbose
         {
             TIME = clock() - TIME;
@@ -298,6 +306,7 @@ Element searchRDA( const set<int> stocks, const double **pweight, int p, unsigne
 
             currStockSize = topElement.m_stocks.size();
         }
+        // -----------------------------------------------------------------------------------------------
 
         findTopElements( topElement.m_stocks, stocks, pweight, k, j, minVal, &Q );
 
@@ -309,6 +318,7 @@ Element searchRDA( const set<int> stocks, const double **pweight, int p, unsigne
     cout << "**************************************************" << endl << endl; //verbose
     cout << "QSz final = " << Q.size() << endl; //verbose
 
+    // Apaga fila da memória
     while( !Q.empty() )
     {
         delete Q.top();
